@@ -23,7 +23,7 @@ fn split_fasta() -> io::Result<()> {
 
     let out1_filename = args[2].replace("{}", "1");
     let mut f_out1 = BufWriter::new(GzEncoder::new(File::create(out1_filename)?, Compression::default()));
-    let out1_filename = args[2].replace("{}", "2");
+    let out2_filename = args[2].replace("{}", "2");
     let mut f_out2 = BufWriter::new(GzEncoder::new(File::create(out2_filename)?, Compression::default()));
 
     let mut buf = Vec::with_capacity(1024);
