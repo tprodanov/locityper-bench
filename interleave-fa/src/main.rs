@@ -21,7 +21,6 @@ fn split_and_interleave() -> io::Result<()> {
     let mut f_in = BufReader::new(MultiGzDecoder::new(BufReader::new(File::open(in_filename)?)));
     let out_filename = &args[2];
     let tmp_filename = format!("{}.tmp", out_filename);
-    println!("{}  {}  {}", in_filename, out_filename, tmp_filename);
     let mut f_out = BufWriter::with_capacity(131_072,
         GzEncoder::new(BufWriter::new(File::create(&tmp_filename)?), Compression::default()));
 
