@@ -3,7 +3,7 @@ use std::{
     fs::File,
 };
 use flate2::{
-    bufread::MultiGzDecoder,
+    bufread::{GzDecoder, MultiGzDecoder},
     write::GzEncoder,
     Compression,
 };
@@ -13,13 +13,8 @@ fn read_line(mut f: impl BufRead, buf: &mut Vec<u8>) -> io::Result<usize> {
     f.read_until(b'\n', buf)
 }
 
-fn split_and_interleave() -> io::Result<()> {
-    let args: Vec<_> = std::env::args().collect();
-    assert_eq!(args.len(), 3);
-
-    let in_filename = &args[1];
+fn split_and_interleave(in_filename: &str, out_filename: &str) -> io::Result<()> {
     let mut f_in = BufReader::new(MultiGzDecoder::new(BufReader::new(File::open(in_filename)?)));
-    let out_filename = &args[2];
     let tmp_filename = format!("{}.tmp", out_filename);
     let mut f_out = BufWriter::with_capacity(131_072,
         GzEncoder::new(BufWriter::new(File::create(&tmp_filename)?), Compression::default()));
@@ -69,6 +64,33 @@ fn split_and_interleave() -> io::Result<()> {
     Ok(())
 }
 
+fn check(filename: &str) -> io::Result<()> {
+    let mut f_in = BufReader::new(GzDecoder::new(BufReader::new(File::open(filename)?)));
+    let mut buf = Vec::with_capacity(2048);
+    loop {
+        buf.clear();
+        let name1_len = read_line(&mut f_in, &mut buf)?;
+        if name1_len == 0 {
+            break;
+        }
+        let seq1_len = read_line(&mut f_in, &mut buf)?;
+        let name2_len = read_line(&mut f_in, &mut buf)?;
+        let seq2_len = read_line(&mut f_in, &mut buf)?;
+        let rec1_len = name1_len + seq1_len;
+        if &buf[..name1_len] != &buf[rec1_len..rec1_len + name2_len] || seq1_len != seq2_len {
+            panic!("Malformed record in {}: ```\n{}\n```", filename, String::from_utf8_lossy(&buf));
+        }
+    }
+    Ok(())
+}
+
 fn main() {
-    split_and_interleave().unwrap()
+    let args: Vec<_> = std::env::args().collect();
+    assert_eq!(args.len(), 3);
+
+    if args[2] == "check" {
+        check(&args[1]).unwrap()
+    } else {
+        split_and_interleave(&args[1], &args[2]).unwrap()
+    }
 }
