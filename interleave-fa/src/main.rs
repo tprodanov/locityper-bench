@@ -64,21 +64,37 @@ fn split_and_interleave(in_filename: &str, out_filename: &str) -> io::Result<()>
     Ok(())
 }
 
+#[inline]
+fn check_seq(seq: &[u8]) -> bool {
+    seq.iter().all(|&b| b == b'A' || b == b'C' || b == b'G' || b == b'T' || b == b'N')
+}
+
 fn check(filename: &str) -> io::Result<()> {
     let mut f_in = BufReader::new(GzDecoder::new(BufReader::new(File::open(filename)?)));
-    let mut buf = Vec::with_capacity(2048);
+    let mut buf1 = Vec::with_capacity(1024);
+    let mut buf2 = Vec::with_capacity(1024);
+    let mut buf3 = Vec::with_capacity(1024);
+    let mut buf4 = Vec::with_capacity(1024);
     loop {
-        buf.clear();
-        let name1_len = read_line(&mut f_in, &mut buf)?;
+        buf1.clear();
+        buf2.clear();
+        buf3.clear();
+        buf4.clear();
+        let name1_len = read_line(&mut f_in, &mut buf1)?;
         if name1_len == 0 {
             break;
         }
-        let seq1_len = read_line(&mut f_in, &mut buf)?;
-        let name2_len = read_line(&mut f_in, &mut buf)?;
-        let seq2_len = read_line(&mut f_in, &mut buf)?;
-        let rec1_len = name1_len + seq1_len;
-        if &buf[..name1_len] != &buf[rec1_len..rec1_len + name2_len] || seq1_len != seq2_len {
-            panic!("Malformed record in {}: ```\n{}\n```", filename, String::from_utf8_lossy(&buf));
+        let seq1_len = read_line(&mut f_in, &mut buf2)?;
+        let name2_len = read_line(&mut f_in, &mut buf3)?;
+        let seq2_len = read_line(&mut f_in, &mut buf4)?;
+
+        if name2_len < 5 || seq1_len < 50 || seq1_len != seq2_len || &buf1 != &buf3
+                || !check_seq(&buf2[..seq1_len - 1])
+                || !check_seq(&buf4[..seq1_len - 1]) {
+            panic!("Malformed record in {}:\n    {}    {}    {}    {}```",
+                filename,
+                String::from_utf8_lossy(&buf1), String::from_utf8_lossy(&buf2),
+                String::from_utf8_lossy(&buf3), String::from_utf8_lossy(&buf4));
         }
     }
     Ok(())
