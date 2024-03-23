@@ -69,12 +69,13 @@ fn check_seq(seq: &[u8]) -> bool {
     seq.iter().all(|&b| b == b'A' || b == b'C' || b == b'G' || b == b'T' || b == b'N')
 }
 
-fn check(filename: &str) -> io::Result<()> {
-    let mut f_in = BufReader::new(GzDecoder::new(BufReader::new(File::open(filename)?)));
+fn check(old_filename: &str, new_filename: &str) -> io::Result<()> {
+    let mut f_in = BufReader::new(GzDecoder::new(BufReader::new(File::open(new_filename)?)));
     let mut buf1 = Vec::with_capacity(1024);
     let mut buf2 = Vec::with_capacity(1024);
     let mut buf3 = Vec::with_capacity(1024);
     let mut buf4 = Vec::with_capacity(1024);
+    let mut total_bytes: usize = 0;
     loop {
         buf1.clear();
         buf2.clear();
@@ -87,26 +88,42 @@ fn check(filename: &str) -> io::Result<()> {
         let seq1_len = read_line(&mut f_in, &mut buf2)?;
         let name2_len = read_line(&mut f_in, &mut buf3)?;
         let seq2_len = read_line(&mut f_in, &mut buf4)?;
+        total_bytes = total_bytes.wrapping_add(name1_len + seq1_len + name2_len + seq2_len);
 
         if name2_len < 5 || seq1_len < 50 || seq1_len != seq2_len || &buf1 != &buf3
                 || !check_seq(&buf2[..seq1_len - 1])
                 || !check_seq(&buf4[..seq1_len - 1]) {
             panic!("Malformed record in {}:\n    {}    {}    {}    {}```",
-                filename,
+                new_filename,
                 String::from_utf8_lossy(&buf1), String::from_utf8_lossy(&buf2),
                 String::from_utf8_lossy(&buf3), String::from_utf8_lossy(&buf4));
         }
     }
+    std::mem::drop(f_in);
+
+    let mut f_in = BufReader::new(MultiGzDecoder::new(BufReader::new(File::open(old_filename)?)));
+    let mut buf = [0; 4096];
+    let mut total_bytes1: usize = 0;
+    loop {
+        let n = f_in.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        total_bytes1 = total_bytes1.wrapping_add(n);
+    }
+    assert_eq!(total_bytes1, total_bytes, "File sizes do not match ({}, {})", old_filename, new_filename);
     Ok(())
 }
 
 fn main() {
     let args: Vec<_> = std::env::args().collect();
-    assert_eq!(args.len(), 3);
+    assert_eq!(args.len(), 4);
 
-    if args[2] == "check" {
-        check(&args[1]).unwrap()
+    if args[1] == "check" {
+        check(&args[2], &args[3]).unwrap()
+    } else if args[1] == "convert" {
+        split_and_interleave(&args[2], &args[3]).unwrap()
     } else {
-        split_and_interleave(&args[1], &args[2]).unwrap()
+        panic!("Unknown mode `{}`", args[1])
     }
 }
