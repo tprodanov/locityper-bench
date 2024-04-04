@@ -2,6 +2,7 @@ import sys
 import gzip
 import os
 import builtins
+import csv
 
 
 def open(filename, mode='r'):
@@ -14,7 +15,15 @@ def open(filename, mode='r'):
         return builtins.open(filename, mode)
 
 
-def parse_coord(coord):
-    chrom, coord = coord.split(':')
-    start, end = map(int, coord.split('-'))
-    return chrom, start - 1, end
+def read_csv(f):
+    """
+    Wrapper over csv.DictReader, that ignores first lines with comments.
+    """
+    fields = None
+    for line in f:
+        if not line.startswith('#'):
+            fields = line.strip().split('\t')
+            break
+    assert fields is not None
+    return csv.DictReader(f, fieldnames=fields, delimiter='\t')
+
