@@ -8,9 +8,34 @@ import random
 import pysam
 import numpy as np
 from tqdm import tqdm
+import glob
+import re
 
 import common
-import summarize
+
+
+def load_tags(path):
+    matches = list(re.finditer(r'\{([a-zA-Z0-9_]+)\}', path))
+    tags = []
+    filename_pattern = '^'
+    glob_pattern = ''
+    s = 0
+    for m in matches:
+        tags.append(m.group(1))
+        filename_pattern += re.escape(path[s:m.start()]) + r'([a-zA-Z0-9_+-]+)'
+        glob_pattern += path[s:m.start()] + '*'
+        s = m.end()
+    filename_pattern += re.escape(path[s:]) + '$'
+    glob_pattern += path[s:]
+
+    filename_pattern = re.compile(filename_pattern)
+    all_tuples = []
+    sys.stderr.write(f'Searching for files/directories `{glob_pattern}`\n')
+    for filename in tqdm(glob.iglob(glob_pattern)):
+        m = filename_pattern.match(filename)
+        if m is not None:
+            all_tuples.append(tuple(m.groups()))
+    return tags, all_tuples
 
 
 def process_file(prefix, filename, out, thresholds):
@@ -96,7 +121,7 @@ def main():
         help='Score thresholds via comma [%(default)s].')
     args = parser.parse_args()
 
-    tags, tag_tuples = summarize.load_tags(args.input)
+    tags, tag_tuples = load_tags(args.input)
     thresholds = np.array(list(map(float, args.thresholds.split(','))))
     gq_unavail = []
     counts = [0, 0]
