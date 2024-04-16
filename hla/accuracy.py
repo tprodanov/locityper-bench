@@ -58,10 +58,14 @@ class Alleles:
 
     def accuracy(self, oth):
         m = -1
+        l = 0
         for t1 in self.options:
             for t2 in oth.options:
-                m = max(m, common_prefix(t1, t2))
-        return m
+                a = common_prefix(t1, t2)
+                if a > m:
+                    m = a
+                    l = len(t1)
+        return m, l
 
 
 def load_alleles(f):
@@ -101,7 +105,7 @@ def permute_best(alleles1, alleles2):
     best_j = 0
     for i, alleles1 in enumerate(perm_alleles1):
         for j, alleles2 in enumerate(perm_alleles2):
-            acc = sum(allele1.accuracy(allele2) for (allele1, _), (allele2, _) in zip(alleles1, alleles2))
+            acc = sum(allele1.accuracy(allele2)[0] for (allele1, _), (allele2, _) in zip(alleles1, alleles2))
             if acc > best_acc:
                 best_acc = acc
                 best_i = i
@@ -121,6 +125,7 @@ def process(gene, sample, input_base, input_pred, avail, loo, out):
             assert pred is not None
             base_allele = '<INPUT_MISSING>' if input_base is None else '<MISSING>'
             acc = 0
+            base_len = np.nan
             curr_avail = 'NA' if avail is None else 'T'
         else:
             base_allele = base[0]
@@ -132,7 +137,7 @@ def process(gene, sample, input_base, input_pred, avail, loo, out):
                 curr_avail = any(
                     not loo or sample != sample2
                         for opt in base_allele.options
-                        for sample2 in avail.get(opt[:2], ())
+                        for sample2 in avail.get(opt[:AVAIL_SIZE], ())
                     )
                 curr_avail = 'T' if curr_avail else 'F'
 
@@ -140,12 +145,16 @@ def process(gene, sample, input_base, input_pred, avail, loo, out):
             pred_allele = '<INPUT_MISSING>' if input_pred is None else '<MISSING>'
             qual = 0
             acc = 0
+            base_len = np.nan
         else:
             pred_allele, qual = pred
 
         if base is not None and pred is not None:
-            acc = base_allele.accuracy(pred_allele)
-        out.write(f'{gene}\t{sample}\t{base_allele}\t{pred_allele}\t{qual}\t{acc}\t{curr_avail}\n')
+            acc, base_len = base_allele.accuracy(pred_allele)
+        out.write(f'{gene}\t{sample}\t{base_allele}\t{pred_allele}\t{qual}\t{acc}\t{base_len}\t{curr_avail}\n')
+
+
+AVAIL_SIZE = 2
 
 
 def load_avail(filename):
@@ -157,7 +166,7 @@ def load_avail(filename):
         for (gene, sample), alleles in avail_dict.items():
             for allele, _ in alleles:
                 for opt in allele.options:
-                    subopt = opt[:2]
+                    subopt = opt[:AVAIL_SIZE]
                     # Safer than using defaultdict later.
                     if gene not in avail:
                         avail[gene] = {}
@@ -188,7 +197,7 @@ def main():
     avail = load_avail(args.available)
 
     with common.open(args.output, 'w') as out:
-        out.write('gene\tsample\tbase\tpred\tqual\taccuracy\tavail\n')
+        out.write('gene\tsample\tbase\tpred\tqual\taccuracy\tbase_length\tavail\n')
         for key in sorted(set(base.keys()) | set(pred.keys())):
             gene, sample = key
             process(gene, sample, base.get(key), pred.get(key), avail and avail.get(gene), args.loo, out)
