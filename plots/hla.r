@@ -149,8 +149,14 @@ filter(counts_a, gene == 'MHC')
 filter(counts_a, gene == 'KIR')
 
 counts_b <- hla_get_counts(acc3, 2)
-filter(counts_b, group != 'Correct group' & group != 'Deletion found') |>
+filter(counts_b, group != 'Correct protein' & group != 'Deletion found') |>
     group_by(tool, gene) |>
-    reframe(group = group, m = round(n / sum(n), 3)) |>
+    reframe(group = group, frac = round(100 * n / sum(n), 1)) |>
     ungroup() |>
+    as.data.frame()
+
+group_by(counts_b, tool, gene) |>
+    reframe(group = group, perc = round(100 * n / sum(n), 1)) |>
+    ungroup() |>
+    filter(group != 'Correct protein' & group != 'Deletion found') |>
     as.data.frame()

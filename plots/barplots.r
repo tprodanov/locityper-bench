@@ -300,25 +300,28 @@ for (letter in c('a', 'b', 'c')) {
         )
 }
 
-plot_grid(
+left_side <- plot_grid(
     plot_grid(
-        plot_grid(
-            aggr_plots$a + theme(legend.position = 'none'),
-            aggr_plots$b + theme(legend.position = 'none', axis.title.y = element_blank()),
-            aggr_plots$c + theme(legend.position = 'none', axis.title.y = element_blank()),
-            nrow = 1,
-            rel_widths = c(0.45, 0.40, 0.15)
-        ),
-        get_legend(aggr_plots$a),
-        nrow = 2,
-        rel_heights = c(0.95, 0.05)
+        aggr_plots$a + theme(legend.position = 'none'),
+        aggr_plots$b + theme(legend.position = 'none', axis.title.y = element_blank()),
+        aggr_plots$c + theme(legend.position = 'none', axis.title.y = element_blank()),
+        nrow = 1,
+        rel_widths = c(0.45, 0.40, 0.15)
     ),
+    get_legend(aggr_plots$a),
+    nrow = 2,
+    rel_heights = c(0.95, 0.05)
+    )
+plot_grid(
+    left_side,
     lost_qv_panel,
     rel_widths = c(0.64, 0.36),
     nrow = 1)
-
 ggsave(file.path(plots_dir, 'fig2.png'), bg = 'white',
     width = 8.1, height = 5, dpi = 600, scale = 0.7)
+
+ggsave(file.path(plots_dir, 'fig2_left.png'), left_side, bg = 'white',
+    width = 4.5, height = 6, dpi = 600, scale = 0.8)
 
 #####################
 
