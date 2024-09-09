@@ -4,6 +4,7 @@ import os
 import sys
 import multiprocessing
 import time
+import numpy as np
 from collections import defaultdict
 import pysam
 import argparse
