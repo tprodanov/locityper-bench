@@ -29,19 +29,23 @@ def find_all_bams(d, samples):
 
 
 def process_one(sample, locus, filename):
-    with pysam.AlignmentFile(filename) as bam:
-        contigs = { contig: i for i, contig in enumerate(sorted(bam.header.references)) }
-        contigs[None] = 2
-        locs = defaultdict(lambda: [0, 0, 0])
-        for record in bam:
-            loc = contigs[record.reference_name]
-            pr = float(record.get_tag('pr'))
-            locs[record.query_name][loc] += pr
+    try:
+        with pysam.AlignmentFile(filename) as bam:
+            contigs = { contig: i for i, contig in enumerate(sorted(bam.header.references)) }
+            contigs[None] = 2
+            locs = defaultdict(lambda: [0, 0, 0])
+            for record in bam:
+                loc = contigs[record.reference_name]
+                pr = float(record.get_tag('pr'))
+                locs[record.query_name][loc] += pr
 
-    s = ''
-    for name, (pr0, pr1, pr2) in locs.items():
-        s += f'{sample}\t{locus}\t{name}\t{pr0:0.2f}\t{pr1:0.2f}\t{pr2:0.2f}\n'
-    return s
+        s = ''
+        for name, (pr0, pr1, pr2) in locs.items():
+            s += f'{sample}\t{locus}\t{name}\t{pr0:0.2f}\t{pr1:0.2f}\t{pr2:0.2f}\n'
+        return s
+    except e:
+        sys.stderr.write(f'Encountered error while processing {sample}-{locus} ({filename}):\n{e}\n')
+        return None
 
 
 def main():
@@ -65,17 +69,22 @@ def main():
     DELTA = 10.0
     time_thresh = time.perf_counter() + DELTA
     finished = 0
+    errors = 0
     total = len(all_paths)
+    total_len = len(f'{total:,}')
 
     def callback(s):
         nonlocal finished, time_thresh
         finished += 1
-        out.write(s)
+        if s is None:
+            errors += 1
+        else:
+            out.write(s)
 
         curr_time = time.perf_counter()
         if time_thresh < curr_time:
             time_thresh = curr_time + DELTA
-            sys.stderr.write(f'Finished [{finished:4} / {total}]\n')
+            sys.stderr.write(f'[{finished:{total_len},} / {total:,}]\n')
             out.flush()
 
     with multiprocessing.Pool(args.threads) as pool:
@@ -84,7 +93,9 @@ def main():
             res.get()
         pool.close()
         pool.join()
-    sys.stderr.write(f'Successfully processed {total} sample-loci pairs\n')
+    sys.stderr.write(f'Successfully processed {finished - errors} sample-loci pairs\n')
+    if errors:
+        sys.stderr.write(f'Encountered errors in {errors} pairs\n')
 
 
 if __name__ == '__main__':
