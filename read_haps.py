@@ -34,17 +34,33 @@ def process_one(sample, locus, filename):
             contigs = { contig: i for i, contig in enumerate(sorted(bam.header.references)) }
             contigs[None] = 2
             locs = defaultdict(lambda: [0, 0, 0])
+            locs2 = defaultdict(lambda: [-np.inf, -np.inf])
             for record in bam:
                 loc = contigs[record.reference_name]
-                pr = float(record.get_tag('pr'))
-                locs[record.query_name][loc] += pr
+                if record.has_tag('pr'):
+                    pr = float(record.get_tag('pr'))
+                    locs[record.query_name][loc] += pr
+                else:
+                    aln_lik = float(record.get_tag('al'))
+                    locs2[record.query_name][loc] = max(locs2[record.query_name][loc], aln_lik)
 
         s = ''
-        for name, (pr0, pr1, pr2) in locs.items():
-            s += f'{sample}\t{locus}\t{name}\t{pr0:0.2f}\t{pr1:0.2f}\t{pr2:0.2f}\n'
+        for name, (pr1, pr2, pr3) in locs.items():
+            assert name not in locs2
+            s += f'{sample}\t{locus}\t{name}\t{pr1:0.2f}\t{pr2:0.2f}\t{pr3:0.2f}\n'
+        for name, (lik1, lik2) in locs2.items():
+            diff = lik1 - lik2:
+            if diff > 1:
+                pr1, pr2 = (0.8, 0.2)
+            elif diff < -1:
+                pr1, pr2 = (0.2, 0.8)
+            else:
+                pr1, pr2 = (0.5, 0.5)
+            s += f'{sample}\t{locus}\t{name}\t{pr1:0.2f}\t{pr2:0.2f}\tNA\n'
+
         return s
     except Exception as e:
-        sys.stderr.write(f'Encountered error while processing {sample}-{locus} ({filename}):\n{e}\n')
+        sys.stderr.write(f'Encountered error while processing {sample} at {locus} ({filename}):\n{e}\n')
         return None
 
 
