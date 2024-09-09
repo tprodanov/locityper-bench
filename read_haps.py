@@ -43,7 +43,7 @@ def process_one(sample, locus, filename):
         for name, (pr0, pr1, pr2) in locs.items():
             s += f'{sample}\t{locus}\t{name}\t{pr0:0.2f}\t{pr1:0.2f}\t{pr2:0.2f}\n'
         return s
-    except e:
+    except Exception as e:
         sys.stderr.write(f'Encountered error while processing {sample}-{locus} ({filename}):\n{e}\n')
         return None
 
@@ -74,7 +74,7 @@ def main():
     total_len = len(f'{total:,}')
 
     def callback(s):
-        nonlocal finished, time_thresh
+        nonlocal finished, errors, time_thresh
         finished += 1
         if s is None:
             errors += 1
