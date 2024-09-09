@@ -49,7 +49,7 @@ def process_one(sample, locus, filename):
             assert name not in locs2
             s += f'{sample}\t{locus}\t{name}\t{pr1:0.2f}\t{pr2:0.2f}\t{pr3:0.2f}\n'
         for name, (lik1, lik2) in locs2.items():
-            diff = lik1 - lik2:
+            diff = lik1 - lik2
             if diff > 1:
                 pr1, pr2 = (0.8, 0.2)
             elif diff < -1:
