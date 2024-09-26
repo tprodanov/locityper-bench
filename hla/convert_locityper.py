@@ -23,7 +23,9 @@ def main():
         genes = []
         locus_to_genes = collections.defaultdict(list)
         for line in f:
-            gene, locus = line.strip().split('\t')
+            if line.startswith('#'):
+                continue
+            gene, locus = line.strip().split()
             genes.append(gene)
             locus_to_genes[locus].append(gene)
 

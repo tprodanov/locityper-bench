@@ -49,7 +49,10 @@ def main():
     for filename in args.annotation:
         name_split = os.path.basename(filename).split('.')
         sample = name_split[0]
-        hap = int(name_split[1])
+        try:
+            hap = int(name_split[1])
+        except ValueError:
+            hap = 0
         print(filename)
         with common.open(filename) as f:
             annotations[sample][max(0, hap - 1)] = parse_annotation(f)

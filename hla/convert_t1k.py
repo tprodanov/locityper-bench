@@ -46,7 +46,7 @@ def process_sample(dir, out):
     dir_split = dir.split('/')
     sample = dir_split[dir_split.index('.') + 1]
     filenames = glob.glob(os.path.join(dir, '*_genotype.tsv'))
-    assert len(filenames) == 1
+    assert len(filenames) == 1, f'{sample}: {filenames}'
 
     gene_alleles = {}
     with common.open(filenames[0]) as f:

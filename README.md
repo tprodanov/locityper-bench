@@ -100,7 +100,7 @@ Finally, we evaluated accuracy with
 ~/Code/locityper-bench/hla/accuracy.py -b Immuannot/annot.csv \
     -p t1k.csv -o eval/t1k.csv
 ~/Code/locityper-bench/hla/accuracy.py -b Immuannot/annot.csv \
-    -p locityper.csv -o eval/locityper.csv -a Immuannot/annot.csv
+    -p locityper.csv -o eval/locityper.csv
 ~/Code/locityper-bench/hla/accuracy.py -b Immuannot/annot.csv \
-    -p locityper_loo.csv -o eval/locityper_loo.csv -a Immuannot/annot.csv --loo
+    -p locityper_loo.csv -o eval/locityper_loo.csv --loo
 ```

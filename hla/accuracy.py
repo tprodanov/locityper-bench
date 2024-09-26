@@ -38,7 +38,7 @@ class Alleles:
             if ':' not in allele:
                 first = int(allele[:3])
                 second = int(allele[3:5]) if len(allele) > 3 else None
-                third = int(allele[5:]) if len(allele) > 5 else None
+                third = int(allele[5:].rstrip('NLQ')) if len(allele) > 5 else None
                 self.options.add((first, second, third))
             else:
                 opt = []
@@ -157,6 +157,23 @@ def process(gene, sample, input_base, input_pred, avail, loo, out):
 AVAIL_SIZE = 2
 
 
+def get_available_alleles(baseline, avail_samples):
+    avail = {}
+    for (gene, sample), alleles in baseline.items():
+        if avail_samples is not None and sample not in avail_samples:
+            continue
+        for allele, _ in alleles:
+            for opt in allele.options:
+                subopt = opt[:AVAIL_SIZE]
+                # Safer than using defaultdict later.
+                if gene not in avail:
+                    avail[gene] = {}
+                if subopt not in avail[gene]:
+                    avail[gene][subopt] = []
+                avail[gene][subopt].append(sample)
+    return avail
+
+
 def load_avail(filename):
     if filename is None:
         return None
@@ -182,10 +199,10 @@ def main():
         help='Baseline alleles.')
     parser.add_argument('-p', '--pred', metavar='FILE', required=True,
         help='Predicted alleles.')
-    parser.add_argument('-a', '--available', metavar='FILE', required=False,
-        help='Optional: available alleles.')
     parser.add_argument('--loo', action='store_true',
         help='Consider leave-one-out for the set of available alleles.')
+    parser.add_argument('--avail', metavar='FILE', required=False,
+        help='Only provided samples were available during genotyping.')
     parser.add_argument('-o', '--output', metavar='FILE', required=True,
         help='Output CSV file.')
     args = parser.parse_args()
@@ -194,7 +211,14 @@ def main():
         base = load_alleles(f)
     with common.open(args.pred) as f:
         pred = load_alleles(f)
-    avail = load_avail(args.available)
+
+    avail = None
+    if args.avail:
+        with common.open(args.avail) as f:
+            avail_samples = set(map(str.strip, f))
+        avail = get_available_alleles(base, avail_samples)
+    elif args.loo:
+        avail = get_available_alleles(base, None)
 
     with common.open(args.output, 'w') as out:
         out.write('gene\tsample\tbase\tpred\tqual\taccuracy\tbase_length\tavail\n')
