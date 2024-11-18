@@ -19,12 +19,18 @@ rgb <- function(r, g, b) {
 }
 
 ascii_qvs <- function(x) {
-     sub('–', '-', x) %>% sub('≥', '>=', .)
+    ifelse(x == 'No call', x,
+        sub('–', '-', x) %>% sub('≥', '>=', .) %>% paste0('QV ', .)
+    )
 }
 
-group_qvs <- function(summary, haps = T) {
-    thresholds <- c(0, 17, 23, 33)
-    labels <- c('<17', '17–23', '23–33', '≥33')
+group_qvs <- function(summary, thresholds, haps = T) {
+    stopifnot(thresholds[1] == 0)
+    n <- length(thresholds)
+    labels <- c(
+        sprintf('<%d', thresholds[2]),
+        sprintf('%d–%d', thresholds[2:(n-1)], thresholds[3:n]),
+        sprintf('≥%d', thresholds[n]))
     get_qv_group <- function(qv) {
         n <- length(thresholds)
         findInterval(qv, thresholds)
@@ -48,23 +54,34 @@ assign_filters <- function(summary) {
             & weight_dist <= 30
             & (unexpl_reads <= 1000 | unexpl_reads <= total_reads * 0.2),
         filt = factor(ifelse(filt, 'Pass', 'Fail'), levels = c('Pass', 'Fail')),
+        qv_cat0 = qv_cat,
+        qv_cat = ifelse(filt == 'Pass', as.character(qv_cat0), 'No call') |>
+            factor(levels = c(levels(qv_cat0), 'No call')),
     )
 }
 
 get_counts <- function(summary) {
     totals <- table(summary$locus)
-    count(summary, locus, qv_cat, filt, name = 'count') |>
-        complete(locus, qv_cat, filt, fill = list(count = 0)) |>
+    count(summary, locus, qv_cat, name = 'count') |>
+        complete(locus, qv_cat, fill = list(count = 0)) |>
         mutate(
             locus = factor(locus),
             frac = as.numeric(count / totals[locus]),
-            inter = interaction(qv_cat, filt, sep = '\n'),
             qv_num = as.numeric(qv_cat)
         )
 }
 
-bound_qv <- function(df, min_val = 40, edit0 = 0.5) {
-    mutate(df, qv = ifelse(is.finite(qv), qv, pmax(min_val, -10 * log10(edit0 / size))))
+bound_qv <- function(df, min_val = 40, edit0 = 0.5, prefix = '') {
+    #mutate(df, qv = ifelse(is.finite(qv), qv, pmax(min_val, -10 * log10(edit0 / size))))
+    name_qv <- paste0(prefix, 'qv')
+    name_size <- paste0(prefix, 'size')
+    stopifnot(name_qv %in% colnames(df))
+    stopifnot(name_size %in% colnames(df))
+    df[[name_qv]] <- ifelse(is.finite(df[[name_qv]]),
+        df[[name_qv]],
+        pmax(min_val, -10 * log10(edit0 / df[[name_size]]))
+        )
+    df
 }
 
 .IMPORTED_COMMON <- T

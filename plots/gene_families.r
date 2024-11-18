@@ -11,7 +11,7 @@ assign_gene_family <- function(df) {
 }
 
 local({
-    ver <- 'v0.14.2-4'
+    ver <- 'v0.17.0'
     summaries_fam <- data.frame()
     for (loo in c(F, T)) {
         summaries_fam <- read.csv(sprintf('%s/%s_illumina_%s.csv.gz',
@@ -28,7 +28,8 @@ local({
         mutate(tech = '1KGP') |>
         assign_gene_family() %>%
         smartbind(summaries_fam, .)
-    summaries_fam <<- group_qvs(summaries_fam) |>
+    thresholds <- c(0, 17, 23, 33)
+    summaries_fam <<- group_qvs(summaries_fam, thresholds) |>
         bound_qv() |>
         assign_filters()
 })
@@ -75,8 +76,9 @@ ggplot(waggr) +
         text = element_text(family = 'Overpass'),
         panel.border = element_blank(),
         panel.grid.minor = element_blank(),
-        legend.position = c(0.9, 0.0),
-        legend.text = element_text(margin = margin(l = -8, r = 0)),
+        legend.position = 'inside',
+        legend.position.inside = c(0.9, 0.0),
+        legend.text = element_text(margin = margin(l = -2, r = 0)),
         legend.margin = margin(b = 4, l = 1, r = 1, t = -2),
         legend.justification = 'bottom',
         plot.margin = margin(l = 1),
@@ -110,6 +112,7 @@ ggplot(mucs) +
         expand = expansion(add = 1)) +
     scale_fill_manual(NULL, values = c(rgb(109, 97, 168), '#1ca449')) +
     scale_alpha_manual(NULL, values = c(1, 0.5)) +
+    guides(fill = guide_legend(order = 1), alpha = guide_legend(order = 2)) +
     theme_bw() +
     theme(
         text = element_text(family = 'Overpass'),
@@ -121,10 +124,11 @@ ggplot(mucs) +
         panel.grid.major.x = element_blank(),
         panel.grid.minor = element_blank(),
         legend.spacing.y = unit(-0.1, 'lines'),
-        legend.text = element_text(margin = margin(t = 1, b = 1, r = 20)),
+        legend.text = element_text(margin = margin(t = 1, b = 1, r = 20, l = 5)),
         legend.key.width = unit(1, 'lines'),
         legend.key.height = unit(0.4, 'lines'),
-        legend.position = c(0.91, 0.735),
+        legend.position = 'inside',
+        legend.position.inside = c(0.91, 0.735),
         plot.margin = margin(l = 1),
     )
 ggsave(file.path(plots_dir, 'improv_MUC.png'),

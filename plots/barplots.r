@@ -57,7 +57,7 @@ draw_barplot <- function(counts, panel_width = 71, colors = NULL,
 
 aggr_summaries <- function(summaries, key) {
     total <- nrow(summaries)
-    aggrs <- mutate(summaries,
+    mutate(summaries,
         qv_cat = factor(ifelse(filt == 'Fail', 'N/A', as.character(qv_cat)),
             levels = c(levels(summaries$qv_cat), 'N/A'))) |>
         count(qv_cat, name = 'count') |>
@@ -110,21 +110,29 @@ describe_several <- function(counts, pattern = '') {
 
 #####################################
 
-ver <- 'v0.14.2-4'
+vers <- c('v0.17.0', 'v0.14.2-4')
 summaries <- list()
 counts <- list()
 for (tech in c('illumina', 'hifi', 'ont', 'sim')) {
     for (loo in c(F, T)) {
-        key <- sprintf('%s%s', tech, ifelse(loo, '_loo', ''))
-        summaries[[key]] <- read.csv(
-            sprintf('%s/%s_%s_%s.csv.gz',
-                eval_dir, ifelse(loo, 'loo', 'full'), tech, ver),
-            sep = '\t', comment = '#') |>
-            filter(locus %in% cmrg_loci) |>
-            group_qvs() |>
-            bound_qv() |>
-            assign_filters()
-        counts[[key]] <- get_counts(summaries[[key]])
+        for (ver in vers) {
+            filename <- sprintf('%s/%s_%s_%s.csv.gz',
+                eval_dir, ifelse(loo, 'loo', 'full'), tech, ver)
+            if (!file.exists(filename)) {
+                next
+            }
+            key <- sprintf('%s%s', tech, ifelse(loo, '_loo', ''))
+            summaries[[key]] <- read.csv(
+                sprintf('%s/%s_%s_%s.csv.gz',
+                    eval_dir, ifelse(loo, 'loo', 'full'), tech, ver),
+                sep = '\t', comment = '#') |>
+                filter(locus %in% cmrg_loci) |>
+                group_qvs() |>
+                bound_qv() |>
+                assign_filters()
+            counts[[key]] <- get_counts(summaries[[key]])
+            break
+        }
     }
 }
 
@@ -360,6 +368,7 @@ plot_grid(
     )
 ggsave(sprintf('%s/barplots/supp2ab.png', plots_dir),
     width = 10, height = 13, dpi = 600, scale = 0.75)
+
 plot_grid(
     barplots$hifi_loo + labs(subtitle = 'Locityper, PacBio HiFi, leave-one-out'),
     barplots$ont_loo + labs(subtitle = 'Locityper, Oxford Nanopore, leave-one-out'),
@@ -377,6 +386,7 @@ ggsave(sprintf('%s/barplots/avail.png', plots_dir),
 ggsave(sprintf('%s/barplots/trios.png', plots_dir),
     draw_barplot(counts$trios, fill_label = 'Concordance (QV)'),
     width = 10, height = 6.5, dpi = 600, scale = 0.75)
+# draw_barplot(counts$trios, fill_label = 'Concordance (QV)')
 
 ##################
 

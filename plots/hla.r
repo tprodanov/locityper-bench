@@ -74,12 +74,12 @@ draw_accuracy <- function(acc, preset, nrows, strip.face = 'italic') {
         theme_bw() +
         theme(
             text = element_text(family = 'Overpass'),
-            legend.title = element_text(margin = margin(r = 5)),
             legend.position = 'top',
             legend.margin = margin(b = -5),
             legend.key.size = unit(0.8, 'lines'),
-            legend.text = element_text(margin = margin(l = -1, r = 4)),
-            axis.text.x =  element_text(angle = 45, hjust = 1, vjust = 1, size = 8),
+            legend.title = element_text(margin = margin(r = 5)),
+            legend.text = element_text(margin = margin(l = 3, r = 5)),
+            axis.text.x =  element_text(size = 7, angle = 90, hjust = 1, vjust = 0.5),
             strip.text = element_text(face = strip.face,
                 size = 9, margin = margin(t = 1, b = 1)),
             strip.background = element_rect(fill = 'gray95', color = NA),
@@ -94,15 +94,15 @@ full_fig <- function(acc1, acc2, acc3, preset) {
     plot_grid(
         draw_accuracy(acc1, preset, 3),
         plot_grid(
-            draw_accuracy(acc2, preset, 1) + theme(legend.position = 'none'),
+            draw_accuracy(acc2, preset, 2) + theme(legend.position = 'none'),
             draw_accuracy(acc3, preset, 1, 'bold') + theme(legend.position = 'none'),
             rel_widths = c(0.75, 0.25),
             labels = c('b', 'c'),
             label_fontfamily = 'Overpass',
-            label_y = 1.06,
+            label_y = 1.01,
             label_x = c(-0.007, -0.017)
             ),
-        rel_heights = c(0.67, 0.33),
+        rel_heights = c(0.6, 0.4),
         nrow = 2,
         labels = 'a',
         label_x = -0.003,
@@ -112,18 +112,22 @@ full_fig <- function(acc1, acc2, acc3, preset) {
 
 #############
 
-hla_dir <- file.path(proj_dir, 'comparison/HLA')
-loci <- read.csv(file.path(hla_dir, 'loci.txt'), sep = '\t', header = F)
+hla_dir <- file.path(proj_dir, 'MHC')
+loci <- read.csv(file.path(hla_dir, 'loci1.txt'), sep = ' ', header = F)$V1
 samples <- readLines(file.path(proj_dir, 'samples/illumina_40.txt'))
 
 acc <- rbind(
-    read.csv(file.path(hla_dir, 'eval/locityper.csv'), sep = '\t', comment = '#') |>
-        mutate(tool = 'Locityper ●'),
-    read.csv(file.path(hla_dir, 'eval/locityper_loo.csv'), sep = '\t', comment = '#') |>
+    # read.csv(file.path(hla_dir, 'eval/locityper1_full.csv'), sep = '\t', comment = '#') |>
+    #     mutate(tool = 'Locityper ●'),
+    read.csv(file.path(hla_dir, 'eval/locityper2_loo.csv'), sep = '\t', comment = '#') |>
         mutate(tool = 'Locityper ○'),
+    read.csv(file.path(hla_dir, 'eval/locityper_looD.csv'), sep = '\t', comment = '#') |>
+        mutate(tool = 'Locityper w1'),
+    read.csv(file.path(hla_dir, 'eval/locityper_looK.csv'), sep = '\t', comment = '#') |>
+        mutate(tool = 'Locityper w2'),
     read.csv(file.path(hla_dir, 'eval/t1k.csv'), sep = '\t', comment = '#') |>
         mutate(tool = 'T1K')) |>
-    filter(gene %in% loci$V1 & sample %in% samples) |>
+    filter(gene %in% loci & sample %in% samples) |>
     mutate(
         tool = factor(tool, levels = unique(tool)),
         ) |>
@@ -136,11 +140,11 @@ acc3 <- mutate(acc,
 
 (main_fig <- full_fig(acc1, acc2, acc3, 1))
 ggsave(file.path(plots_dir, 'HLA_main.png'), main_fig,
-    width = 10, height = 7, dpi = 600, scale = 0.8)
+    width = 10, height = 10, dpi = 600, scale = 0.8)
 
 (supp_fig <- full_fig(acc1, acc2, acc3, 2))
 ggsave(file.path(plots_dir, 'HLA_supp.png'), supp_fig,
-    width = 10, height = 7, dpi = 600, scale = 0.8)
+    width = 10, height = 10, dpi = 600, scale = 0.8)
 
 #############
 
@@ -149,6 +153,7 @@ filter(counts_a, gene == 'MHC')
 filter(counts_a, gene == 'KIR')
 
 counts_b <- hla_get_counts(acc3, 2)
+select(counts_b, !c(total, cum_frac)) |> arrange(tool, gene, group) |> print(n = 100)
 filter(counts_b, group != 'Correct protein' & group != 'Deletion found') |>
     group_by(tool, gene) |>
     reframe(group = group, frac = round(100 * n / sum(n), 1)) |>
@@ -160,3 +165,14 @@ group_by(counts_b, tool, gene) |>
     ungroup() |>
     filter(group != 'Correct protein' & group != 'Deletion found') |>
     as.data.frame()
+
+filter(counts_b, group != 'Missing copy' & group != 'Unavailable protein') |>
+    mutate(correct = group == 'Deletion found' | group == 'Correct protein') |>
+    group_by(tool, gene, correct) |>
+    summarize(n = sum(n)) |>
+    ungroup() |>
+    group_by(tool, gene) |>
+    reframe(correct = correct, perc = round(100 * n / sum(n), 1)) |>
+    ungroup() |>
+    as.data.frame()
+
