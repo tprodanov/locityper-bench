@@ -6,6 +6,7 @@ library(stringi)
 library(crayon)
 library(cowplot)
 library(gtools)
+library(Cairo)
 cowplot::set_null_device('agg')
 
 proj_dir <- '~/Data/proj/locityper'
@@ -82,6 +83,13 @@ bound_qv <- function(df, min_val = 40, edit0 = 0.5, prefix = '') {
         pmax(min_val, -10 * log10(edit0 / df[[name_size]]))
         )
     df
+}
+
+draw_pdf <- function(filename, g, width = 15, height = 10, scale = 1, ...) {
+    Cairo(type = 'pdf', file = filename,
+        units = 'cm', width = width / scale, height = height / scale, ...)
+    plot(g)
+    while (!is.null(dev.list())) { dev.off() }
 }
 
 .IMPORTED_COMMON <- T

@@ -1,4 +1,5 @@
 if (!exists('.IMPORTED_COMMON')) { source('common.r') }
+library(ggtext)
 
 extend_accuracy <- function(accuracies) {
     max_acc <- 4
@@ -57,7 +58,7 @@ hla_get_counts <- function(acc, preset) {
         ungroup()
 }
 
-draw_accuracy <- function(acc, preset, nrows, strip.face = 'italic') {
+draw_accuracy <- function(acc, preset, nrows) {
     counts <- hla_get_counts(acc, preset)
     ggplot(counts) +
         geom_bar(aes(tool, frac, fill = group), stat = 'identity',
@@ -66,8 +67,7 @@ draw_accuracy <- function(acc, preset, nrows, strip.face = 'italic') {
             linetype = '14', linewidth = 0.3, color = 'gray10') +
         facet_wrap(~ gene, nrow = nrows) +
         scale_x_discrete(NULL, expand = c(0, 0)) +
-        scale_y_continuous(
-            ifelse(nrows == 1, 'Frac. of haplotypes     ', 'Fraction of haplotypes'),
+        scale_y_continuous('Fraction of haplotypes',
             breaks = seq(0, 1, 0.5), expand = c(0, 0)) +
         scale_fill_manual(fill_names[[preset]], values = colors[[preset]]) +
         guides(fill = guide_legend(nrow = 1)) +
@@ -79,33 +79,31 @@ draw_accuracy <- function(acc, preset, nrows, strip.face = 'italic') {
             legend.key.size = unit(0.8, 'lines'),
             legend.title = element_text(margin = margin(r = 5)),
             legend.text = element_text(margin = margin(l = 3, r = 5)),
-            axis.text.x =  element_text(size = 7, angle = 90, hjust = 1, vjust = 0.5),
-            strip.text = element_text(face = strip.face,
-                size = 9, margin = margin(t = 1, b = 1)),
+            axis.text.x =  element_markdown(size = 7, angle = 90, hjust = 1, vjust = 0.5),
+            strip.text = element_markdown(size = 9, margin = margin(t = 1, b = 1)),
             strip.background = element_rect(fill = 'gray95', color = NA),
             panel.grid = element_blank(),
             panel.background = element_rect(fill = NA, color = NA),
             panel.border = element_rect(fill = NA, color = NA),
+            panel.spacing.x = unit(0.2, 'lines'),
             panel.spacing.y = unit(0.2, 'lines'),
         )
 }
 
-full_fig <- function(acc1, acc2, acc3, preset) {
+full_fig <- function(acc1, acc2, preset) {
     plot_grid(
         draw_accuracy(acc1, preset, 3),
         plot_grid(
+            NULL,
             draw_accuracy(acc2, preset, 2) + theme(legend.position = 'none'),
-            draw_accuracy(acc3, preset, 1, 'bold') + theme(legend.position = 'none'),
-            rel_widths = c(0.75, 0.25),
-            labels = c('b', 'c'),
-            label_fontfamily = 'Overpass',
-            label_y = 1.01,
-            label_x = c(-0.007, -0.017)
-            ),
+            NULL,
+            nrow = 1,
+            rel_widths = c(0.12, 0.78, 0.10)
+        ),
         rel_heights = c(0.6, 0.4),
         nrow = 2,
-        labels = 'a',
-        label_x = -0.003,
+        labels = letters,
+        label_x = c(0.01, 0.123),
         label_y = 1.01,
         label_fontfamily = 'Overpass')
 }
@@ -117,36 +115,41 @@ loci <- read.csv(file.path(hla_dir, 'loci1.txt'), sep = ' ', header = F)$V1
 samples <- readLines(file.path(proj_dir, 'samples/illumina_40.txt'))
 
 acc <- rbind(
-    # read.csv(file.path(hla_dir, 'eval/locityper1_full.csv'), sep = '\t', comment = '#') |>
-    #     mutate(tool = 'Locityper ●'),
-    read.csv(file.path(hla_dir, 'eval/locityper2_loo.csv'), sep = '\t', comment = '#') |>
-        mutate(tool = 'Locityper ○'),
-    read.csv(file.path(hla_dir, 'eval/locityper_looD.csv'), sep = '\t', comment = '#') |>
-        mutate(tool = 'Locityper w1'),
-    read.csv(file.path(hla_dir, 'eval/locityper_looK.csv'), sep = '\t', comment = '#') |>
-        mutate(tool = 'Locityper w2'),
+    read.csv(file.path(hla_dir, 'eval/locityper_full.csv'), sep = '\t', comment = '#') |>
+        mutate(tool = 'F'),
+    read.csv(file.path(hla_dir, 'eval/locityper_loo.csv'), sep = '\t', comment = '#') |>
+        mutate(tool = 'L'),
+    read.csv(file.path(hla_dir, 'eval/locityper_loow.csv'), sep = '\t', comment = '#') |>
+        mutate(tool = 'W'),
     read.csv(file.path(hla_dir, 'eval/t1k.csv'), sep = '\t', comment = '#') |>
-        mutate(tool = 'T1K')) |>
+        mutate(tool = '**T1K**')) |>
     filter(gene %in% loci & sample %in% samples) |>
     mutate(
         tool = factor(tool, levels = unique(tool)),
         ) |>
     extend_accuracy()
 
-acc1 <- filter(acc, !grepl('^KIR', gene)) |> mutate(gene = sub('^HLA-', '-', gene))
-acc2 <- filter(acc, grepl('^KIR', gene)) |> mutate(gene = sub('^KIR', '', gene))
-acc3 <- mutate(acc,
-    gene = factor(ifelse(grepl('^KIR', gene), 'KIR', 'MHC'), levels = c('MHC', 'KIR')))
+acc1 <- filter(acc, !grepl('^KIR', gene)) |>
+    mutate(gene = sub('^HLA-', '-', gene) %>% sprintf('*%s*', .) |> factor()) %>%
+    rbind(., mutate(., gene = '**Average**'))
+acc2 <- filter(acc, grepl('KIR', gene)) |>
+    mutate(gene = sub('^KIR', '', gene) %>% sprintf('*%s*', .) |> factor()) %>%
+    rbind(., mutate(., gene = '**Average**'))
 
-(main_fig <- full_fig(acc1, acc2, acc3, 1))
-ggsave(file.path(plots_dir, 'HLA_main.png'), main_fig,
-    width = 10, height = 10, dpi = 600, scale = 0.8)
+(main_fig <- full_fig(acc1, acc2, 1))
+ggsave(file.path(plots_dir, 'HLA_main.png'), main_fig, bg = 'white',
+    width = 10, height = 8, dpi = 600, scale = 0.8)
 
-(supp_fig <- full_fig(acc1, acc2, acc3, 2))
-ggsave(file.path(plots_dir, 'HLA_supp.png'), supp_fig,
-    width = 10, height = 10, dpi = 600, scale = 0.8)
+(supp_fig <- full_fig(acc1, acc2, 2))
+ggsave(file.path(plots_dir, 'HLA_supp.png'), supp_fig, bg = 'white',
+    width = 10, height = 8, dpi = 600, scale = 0.8)
+
+
 
 #############
+
+acc3 <- mutate(acc, gene0 = gene, gene = ifelse(grepl('^KIR', gene0), 'KIR', 'MHC'))
+select(acc3, gene0, gene) |> unique() |> count(gene)
 
 counts_a <- hla_get_counts(acc3, 1)
 filter(counts_a, gene == 'MHC')

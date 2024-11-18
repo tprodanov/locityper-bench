@@ -120,6 +120,24 @@ summaries$nygc <- read.csv(
 counts$nygc <- get_counts(summaries$nygc)
 describe(counts$nygc)
 
+summaries$sniffles <- read.csv(
+    sprintf('%s/hifi-phasing/summaries/sniffles.eval.csv.gz', proj_dir),
+        sep = '\t', comment = '#') |>
+    filter(locus %in% cmrg_loci) |>
+    group_qvs(THRESHOLDS) |> bound_qv() |>
+    mutate(filt = 'Pass') # |> assign_filters()
+counts$sniffles <- get_counts(summaries$sniffles)
+describe(counts$sniffles)
+
+summaries$sniffles2 <- read.csv(
+    sprintf('%s/hifi-phasing/summaries/merged.eval.csv.gz', proj_dir),
+        sep = '\t', comment = '#') |>
+    filter(locus %in% cmrg_loci) |>
+    group_qvs(THRESHOLDS) |> bound_qv() |>
+    mutate(filt = 'Pass') # |> assign_filters()
+counts$sniffles2 <- get_counts(summaries$sniffles2)
+describe(counts$sniffles2)
+
 summaries$avail <- mutate(summaries$illumina_loo,
     edit = avail_edit,
     size = avail_size,
@@ -159,8 +177,10 @@ aggrs <- lapply(names(summaries),
             grepl('^(illumina|hifi|ont|sim)_loo$', key) ~ 'Locityper (LOO)',
             grepl('^(illumina|hifi|ont|sim)$', key) ~ 'Locityper (full)',
             key == 'nygc' ~ '1KGP',
+            key == 'sniffles' ~ 'S',
+            key == 'sniffles2' ~ 'S+D',
             T ~ ' ') |>
-            factor(levels = c('Locityper (LOO)', '1KGP', 'Locityper (full)', ' ')),
+            factor(levels = c('Locityper (LOO)', '1KGP', 'S', 'S+D', 'Locityper (full)', ' ')),
         label = case_when(
             grepl('illumina', key) ~ 'Illumina',
             grepl('sim', key) ~ 'Simulated',
@@ -168,6 +188,8 @@ aggrs <- lapply(names(summaries),
             grepl('ont', key) ~ 'ONT',
             key == 'avail' ~ 'Any',
             key == 'nygc' ~ 'Illumina',
+            key == 'sniffles' ~ 'HiFi',
+            key == 'sniffles2' ~ 'HiFi',
             key == 'trios' ~ 'Illumina') |>
             factor(levels = c('Illumina', 'Simulated', 'HiFi', 'ONT', 'Any'))
     )
