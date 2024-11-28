@@ -6,6 +6,7 @@ library(stringi)
 library(crayon)
 library(cowplot)
 library(gtools)
+library(ggh4x)
 library(Cairo)
 cowplot::set_null_device('agg')
 
@@ -51,13 +52,15 @@ assign_filters <- function(summary) {
     mutate(
         weight_dist = replace_na(weight_dist, 0),
         unexpl_reads = replace_na(unexpl_reads, 0),
-        filt = warnings == '*'
-            & weight_dist <= 30
-            & (unexpl_reads <= 1000 | unexpl_reads <= total_reads * 0.2),
+        filt = !(warnings != '*'
+            | weight_dist >= 50
+            ##| (unexpl_reads >= 100 & unexpl_reads >= total_reads * 0.05)
+            ),
         filt = factor(ifelse(filt, 'Pass', 'Fail'), levels = c('Pass', 'Fail')),
-        qv_cat0 = qv_cat,
+        qv_cat0 = qv_cat, qv_num0 = qv_num,
         qv_cat = ifelse(filt == 'Pass', as.character(qv_cat0), 'No call') |>
             factor(levels = c(levels(qv_cat0), 'No call')),
+        qv_num = as.numeric(qv_cat),
     )
 }
 
