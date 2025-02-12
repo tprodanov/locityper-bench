@@ -22,7 +22,7 @@ draw_barplot <- function(summary, panel_width = 71, fill_label = 'Accuracy (QV)'
             width = 1, color = '#000000C0', linewidth = 0.1) +
         facet_wrap(~ panel, ncol = 1, scales = 'free_x') +
         scale_x_discrete(NULL, expand = c(0, 0)) +
-        scale_y_continuous('Fraction of haplotypes   ', expand = c(0, 0)) +
+        scale_y_continuous('Fraction of haplotypes', expand = c(0, 0), breaks = seq(0, 1, 0.2)) +
         scale_fill_manual(paste0(fill_label, ' '),
             breaks = levels(counts$qv_cat),
             values = c(COLORS, 'gray80')) +
@@ -31,7 +31,7 @@ draw_barplot <- function(summary, panel_width = 71, fill_label = 'Accuracy (QV)'
         theme(
             text = element_text(family = 'Overpass'),
             panel.grid.minor = element_blank(),
-            panel.grid.major.y = element_line(linetype = '22',
+            panel.grid.major.y = element_line(linetype = '24',
                 color = '#000000C0', linewidth = 0.2),
             panel.background = element_rect(fill = NA),
             panel.ontop = TRUE,
@@ -62,7 +62,7 @@ percentage <- function(a, b) {
     sprintf('%5d/%5d (%5.1f%%)', a, b, 100 * a / b)
 }
 .subdescribe <- function(summary) {
-    cat(sprintf('    Mean QV: %.1f,  Median: %.1f\n', mean(summary$qv), median(summary$qv)))
+    cat(sprintf('    Mean QV: %.2f,  Median: %.2f\n', mean(summary$qv), median(summary$qv)))
     cats <- levels(summary$qv_cat)
     n <- nrow(summary)
     x <- summary$qv_num
@@ -104,19 +104,7 @@ describe_several <- function(summaries, pattern = '') {
     }
 }
 
-#####################################
-
-s <- read.csv(sprintf('%s/loo_illumina_v0.17.0.csv.gz', eval_dir),
-    sep = '\t', comment = '#') |>
-    filter(locus %in% cmrg_loci) |>
-    group_qvs(THRESHOLDS) |>
-    bound_qv()
-assign_filters(s) |> describe(F)
-describe(s)
-
-#################
-
-vers <- c('v0.17.0') #, 'v0.14.2-4')
+vers <- c('v0.17.0')
 summaries <- list()
 for (tech in c('illumina', 'hifi', 'ont', 'sim')) {
     for (loo in c(F, T)) {
@@ -133,8 +121,8 @@ for (tech in c('illumina', 'hifi', 'ont', 'sim')) {
                 sep = '\t', comment = '#') |>
                 filter(locus %in% cmrg_loci) |>
                 group_qvs(THRESHOLDS) |>
-                bound_qv() |>
-                assign_filters()
+                bound_qv() #|>
+                # assign_filters()
             break
         }
     }
@@ -146,6 +134,7 @@ summaries$nygc <- read.csv(
     group_qvs(THRESHOLDS) |> bound_qv() |>
     mutate(filt = 'Pass') # |> assign_filters()
 describe(summaries$nygc)
+100 * mean(summaries$nygc$qv >= 40)
 
 summaries$sniffles <- read.csv(
     sprintf('%s/hifi-phasing/summaries/sniffles.eval.csv.gz', proj_dir),
@@ -167,8 +156,7 @@ summaries$illumina_cram <- read.csv(
     sprintf('%s/summaries/327/eval/loo_illumina_cram_v0.17.3.csv.gz', proj_dir),
         sep = '\t', comment = '#') |>
     filter(locus %in% cmrg_loci) |>
-    group_qvs(THRESHOLDS) |> bound_qv() |>
-    assign_filters()
+    group_qvs(THRESHOLDS) |> bound_qv() # |> assign_filters()
 describe(summaries$illumina_cram)
 
 summaries$avail <- mutate(summaries$illumina_loo,
@@ -191,6 +179,7 @@ local({
         mutate(filt = 'Pass')
     cat(sprintf('%s trios loaded\n', length(unique(summaries$trios$indiv))))
 })
+summaries$trios$qv |> median()
 
 ##########################
 
@@ -225,11 +214,19 @@ aggrs <- lapply(names(summaries),
             factor(levels = c('Locityper (LOO)', 'Avail', 'Other', 'Trios', 'Locityper (full)')),
         x = match(key, plot_order[1,])
     )
+medians <- lapply(names(summaries),
+    function(name) data.frame(key = name, median = median(summaries[[name]]$qv))) %>%
+    do.call(rbind, .) |>
+    right_join(filter(aggrs, as.numeric(qv_cat) == 1), join_by(key))
 
 (top_half <- ggplot(aggrs) +
     geom_bar(aes(x, frac, fill = qv_cat),
         position = position_stack(reverse = F),
         stat = 'identity', width = 1, color = '#000000C0', linewidth = 0.1) +
+    geom_text(aes(x, 1.01, label = round(median, 1)),
+        data = medians,
+        family = 'Overpass', size = 2.4, vjust = 0, color = 'gray20') +
+    geom_hline(yintercept = 1.05, color = 'gray20') +
     facet_grid2(. ~ facet, space = 'free', scales = 'free', axes = 'y') +
     scale_fill_manual('QV',
         breaks = levels(summaries$illumina$qv_cat),
@@ -246,7 +243,7 @@ aggrs <- lapply(names(summaries),
         sec.axis = dup_axis(name = NULL, labels = plot_order[3,]),
         ) +
     scale_y_continuous('Fraction of haplotypes',
-        breaks = seq(0, 1, 0.2), expand = c(0, 0),
+        breaks = seq(0, 1, 0.2), expand = c(0, 0),# limits = c(0, 1.045),
         ) +
     theme_bw() +
     theme(
@@ -256,13 +253,6 @@ aggrs <- lapply(names(summaries),
         panel.grid = element_blank(),
         panel.border = element_blank(),
         legend.position = 'none',
-        # legend.position = 'right',
-        # legend.margin = margin(l = -5, r = 0),
-        # legend.title = element_text(size = 10, family = 'Overpass SemiBold'),
-        # legend.text = element_text(size = 8, family = 'Overpass',
-        #     margin = margin(l = 2), hjust = 0.5),
-        # legend.key.size = unit(0.8, 'lines'),
-        # legend.background = element_blank(),
         strip.background = element_blank(),
         strip.text = element_blank(),
         panel.spacing.x = unit(0.1, 'lines'),
@@ -286,12 +276,13 @@ ggsave(file.path(plots_dir, 'fig2_top.png'), top_half, bg = 'white',
 lost_qv <- rbind(add_column(summaries$hifi_loo, tech = 'HiFi'),
         add_column(summaries$illumina_loo, tech = 'Illumina')) |>
     mutate(tech = factor(tech, levels = c('Illumina', 'HiFi'))) |>
-    filter(filt == 'Pass') |>
+    # filter(filt == 'Pass') |>
     bound_qv() |>
     bound_qv(prefix = 'avail_') |>
     mutate(
         round_avail_qv = round(avail_qv),
-        corrected_qv = qv + round_avail_qv - avail_qv
+        corrected_qv = qv + round_avail_qv - avail_qv,
+        diff = avail_qv - qv,
     )
 
 MIN_QV <- 17
@@ -317,7 +308,7 @@ MAX_QV <- 43
         size = 5, family = 'Overpass', hjust = 0, angle = 18, color = 'firebrick4') +
     scale_x_continuous('Haplotype availabilty (QV)', expand = c(0, 0),
         breaks = seq(20, 40, 10)) +
-    scale_y_continuous('Haplotyping accuracy (QV)', expand = c(0, 0)) +    
+    scale_y_continuous('Haplotyping accuracy (QV)', expand = c(0, 0)) +
     coord_cartesian(xlim = c(MIN_QV - 2, MAX_QV + 2), ylim = c(-3, MAX_QV + 1)) +
     theme_bw() +
     theme(
@@ -343,34 +334,29 @@ for (key in names(summaries)) {
     barplots[[key]] <- draw_barplot(summaries[[key]])
 }
 
+ggsave(sprintf('%s/barplots/illumina_loo.png', plots_dir),
+    barplots$illumina_loo,
+    width = 10, height = 7, dpi = 600, scale = 0.75)
+
 plot_grid(
-    barplots$sim_loo + labs(subtitle = 'Simulated data'),
-    barplots$hifi_loo + labs(subtitle = 'PacBio HiFi'),
+    barplots$sim_loo + labs(subtitle = 'Locityper, LOO, Simulated short reads'),
+    barplots$hifi_loo + labs(subtitle = 'Locityper, LOO, PacBio HiFi'),
     nrow = 2,
     labels = c('a', 'b'),
     label_fontfamily = 'Overpass',
     label_y = 1.015
     )
-ggsave(sprintf('%s/barplots/supp1ab.png', plots_dir),
+ggsave(sprintf('%s/barplots/loo1.png', plots_dir),
     width = 10, height = 13, dpi = 600, scale = 0.75)
-ggsave(sprintf('%s/barplots/supp1c.png', plots_dir),
-    barplots$ont_loo,
+plot_grid(
+    barplots$ont_loo + labs(subtitle = 'Locityper, LOO, Oxford Nanopore'),
+    nrow = 1,
+    labels = 'c',
+    label_fontfamily = 'Overpass',
+    label_y = 1.015
+    )
+ggsave(sprintf('%s/barplots/loo2.png', plots_dir),
     width = 10, height = 6.5, dpi = 600, scale = 0.75)
-ggsave(sprintf('%s/barplots/avail.png', plots_dir),
-    barplots$avail,
-    width = 10, height = 6.5, dpi = 600, scale = 0.75)
-
-
-
-# ggsave(sprintf('%s/barplots/illumina.png', plots_dir),
-#     barplots$illumina,
-#     width = 10, height = 7, dpi = 600, scale = 0.75)
-ggsave(sprintf('%s/barplots/illumina_loo.png', plots_dir),
-    barplots$illumina_loo,
-    width = 10, height = 7, dpi = 600, scale = 0.75)
-# ggsave(sprintf('%s/barplots/avail.png', plots_dir),
-#     barplots$avail,
-#     width = 10, height = 7, dpi = 600, scale = 0.75)
 
 ggsave(sprintf('%s/barplots/avail.png', plots_dir),
     draw_barplot(summaries$avail, fill_label = 'Availability (QV)'),
@@ -378,36 +364,39 @@ ggsave(sprintf('%s/barplots/avail.png', plots_dir),
 ggsave(sprintf('%s/barplots/nygc.png', plots_dir),
     barplots$nygc,
     width = 10, height = 6.5, dpi = 600, scale = 0.75)
-
 plot_grid(
-    barplots$avail + labs(subtitle = 'Locityper, Haplotype availability'),
-    barplots$sim_loo + labs(subtitle = 'Sim'),
+    barplots$sniffles + labs(subtitle = 'Sniffles'),
+    barplots$sniffles2 + labs(subtitle = 'Sniffles + Deepvariant'),
     nrow = 2,
     labels = c('a', 'b'),
     label_fontfamily = 'Overpass',
     label_y = 1.015
     )
+ggsave(sprintf('%s/barplots/sniffles.png', plots_dir),
+    width = 10, height = 13, dpi = 600, scale = 0.75)
+ggsave(sprintf('%s/barplots/trios.png', plots_dir),
+    draw_barplot(summaries$trios, fill_label = 'Concordance (QV)'),
+    width = 10, height = 6.5, dpi = 600, scale = 0.75)
 
 plot_grid(
-    barplots$sim + labs(subtitle = 'Locityper, Simulated data'),
-    barplots$nygc + labs(subtitle = '1KGP phased call set'),
+    barplots$illumina + labs(subtitle = 'Locityper, full panel, Illumina'),
+    barplots$sim + labs(subtitle = 'Locityper, full panel, Simulated data'),
     nrow = 2,
     labels = c('a', 'b'),
     label_fontfamily = 'Overpass',
     label_y = 1.015
     )
-ggsave(sprintf('%s/barplots/supp1ab.png', plots_dir),
+ggsave(sprintf('%s/barplots/full1.png', plots_dir),
         width = 10, height = 13, dpi = 600, scale = 0.75)
-
 plot_grid(
-    barplots$hifi + labs(subtitle = 'Locityper, PacBio HiFi'),
-    barplots$ont + labs(subtitle = 'Locityper, Oxford Nanopore'),
+    barplots$hifi + labs(subtitle = 'Locityper, full panel, PacBio HiFi'),
+    barplots$ont + labs(subtitle = 'Locityper, full panel, Oxford Nanopore'),
     nrow = 2,
     labels = c('c', 'd'),
     label_fontfamily = 'Overpass',
     label_y = 1.015
     )
-ggsave(sprintf('%s/barplots/supp1cd.png', plots_dir),
+ggsave(sprintf('%s/barplots/full2.png', plots_dir),
     width = 10, height = 13, dpi = 600, scale = 0.75)
 
 plot_grid(
@@ -468,31 +457,25 @@ trios_union <- union(summaries$trios$indiv, summaries$trios$mother) |>
 
 hprc_samples <- readLines('~/Data/data/samples/HPRC.txt')
 setdiff(hprc_samples, trios_union) |> paste0(collapse = ', ')
-describe(counts$trios)
+describe(summaries$trios)
+aggregate(qv ~ locus, summaries$trios, median) |> arrange(qv)
+aggregate(qv ~ locus, summaries$trios, mean) |> arrange(qv)
+aggregate(qv ~ locus, summaries$trios, median) |> with(sum(qv >= 33))
+
 
 #####
 
-.summary_to_row <- function(summary, key, overall_total = NA) {
+summary_to_row <- function(summary, key) {
     tab <- count(summary, qv_cat, name = 'count') |>
         mutate(perc = 100 * count / sum(count))
     row <- pivot_wider(tab, names_from = 'qv_cat', values_from = c('count', 'perc')) |>
         mutate(key = key, mean = mean(summary$qv), median = median(summary$qv),
-            total = nrow(summary), total_perc = 100 * total / overall_total)
-    cols <- c('key', 'mean', 'median', 'total', 'total_perc')
+            total = nrow(summary))
+    cols <- c('key', 'mean', 'median', 'total')
     for (cat in tab$qv_cat) {
         cols <- c(cols, sprintf('%s_%s', c('count', 'perc'), cat))
     }
     row[cols]
-}
-summary_to_row <- function(summary, key) {
-    if (any(summary$qv_cat == 'No call')) {
-        rbind(
-            mutate(summary, qv_cat = qv_cat0) |> .summary_to_row(key),
-            filter(summary, qv_cat != 'No call') |> .summary_to_row(key, nrow(summary))
-        )
-    } else {
-        .summary_to_row(summary, key)
-    }
 }
 tab <- lapply(names(summaries),
     function(name) summary_to_row(summaries[[name]], name)) %>%
@@ -504,5 +487,5 @@ tab <- lapply(names(summaries),
         'trios',
         'illumina', 'sim', 'hifi', 'ont'
         ))) |>
-    arrange(key, is.na(total_perc))
+    arrange(key)
 write.table(tab, file.path(plots_dir, 'barplots.csv'), row.names = F, quote = F, sep = '\t')

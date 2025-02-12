@@ -37,7 +37,7 @@ group_qvs <- function(summary, thresholds, haps = T) {
         n <- length(thresholds)
         findInterval(qv, thresholds)
     }
-    
+
     filter(summary, !is.na(qv) & (query_type == 'hap') == haps) |>
     mutate(
         qv_cat = factor(labels[get_qv_group(qv)], levels = rev(labels)),

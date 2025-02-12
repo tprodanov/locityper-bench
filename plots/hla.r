@@ -115,9 +115,9 @@ loci <- read.csv(file.path(hla_dir, 'loci1.txt'), sep = ' ', header = F)$V1
 samples <- readLines(file.path(proj_dir, 'samples/illumina_40.txt'))
 
 acc <- rbind(
-    read.csv(file.path(hla_dir, 'eval/locityper_full.csv'), sep = '\t', comment = '#') |>
+    read.csv(file.path(hla_dir, 'eval/locityper_full2.csv'), sep = '\t', comment = '#') |>
         mutate(tool = 'F'),
-    read.csv(file.path(hla_dir, 'eval/locityper_loo.csv'), sep = '\t', comment = '#') |>
+    read.csv(file.path(hla_dir, 'eval/locityper_loo2.csv'), sep = '\t', comment = '#') |>
         mutate(tool = 'L'),
     read.csv(file.path(hla_dir, 'eval/locityper_loow.csv'), sep = '\t', comment = '#') |>
         mutate(tool = 'W'),
@@ -137,7 +137,7 @@ acc2 <- filter(acc, grepl('KIR', gene)) |>
     rbind(., mutate(., gene = '**Average**'))
 
 (main_fig <- full_fig(acc1, acc2, 1))
-ggsave(file.path(plots_dir, 'HLA_main.png'), main_fig, bg = 'white',
+ggsave(file.path(plots_dir, 'HLA_main2.png'), main_fig, bg = 'white',
     width = 10, height = 8, dpi = 600, scale = 0.8)
 
 (supp_fig <- full_fig(acc1, acc2, 2))
@@ -154,6 +154,17 @@ select(acc3, gene0, gene) |> unique() |> count(gene)
 counts_a <- hla_get_counts(acc3, 1)
 filter(counts_a, gene == 'MHC')
 filter(counts_a, gene == 'KIR')
+
+hla_get_counts(acc, 1) |> filter(grepl('HLA-[ABC]', gene)) |>
+    arrange(gene, tool) |>
+    mutate(
+        frac = round(100 * frac, 1),
+        cum_frac = round(100 * cum_frac, 1)) |>
+    as.data.frame() |>
+    filter(tool %in% c('W', '**T1K**'))
+hla_get_counts(acc, 2) |> filter(grepl('HLA-[ABC]', gene)) |>
+    arrange(gene, tool) |> filter(group != '1' & group != '0' & (tool == 'L' | tool == 'W')) |>
+    select(!frac) |> mutate(cum_frac = round(100 * cum_frac, 1)) |> as.data.frame()
 
 counts_b <- hla_get_counts(acc3, 2)
 select(counts_b, !c(total, cum_frac)) |> arrange(tool, gene, group) |> print(n = 100)
@@ -179,3 +190,14 @@ filter(counts_b, group != 'Missing copy' & group != 'Unavailable protein') |>
     ungroup() |>
     as.data.frame()
 
+hla_get_counts(acc1, 2) |> filter(grepl('-(A|B|DRB1)', gene)) |> as.data.frame() |>
+    arrange(tool, gene, group)
+
+new_genes <- c(sprintf('HLA-%s', c('DRB3', 'DRB4', 'Y', 'HFE')),
+    sprintf('KIR%s', c('2DL2', '2DL5A', '2DL5B', '2DP1', '2DS1', '2DS2', '2DS3', '2DS5')))
+
+hla_get_counts(acc, 1) |> filter(tool == 'W' & (gene %in% new_genes)) |>
+    mutate(ty = ifelse(startsWith(gene, 'KIR'), 'KIR', 'HLA')) |>
+    filter(group != '0' & group != '1') |>
+    group_by(gene) |> slice_tail(n = 1) |> ungroup() %>%
+    aggregate(cum_frac ~ ty, ., mean)

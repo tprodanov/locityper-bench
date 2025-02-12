@@ -30,8 +30,7 @@ local({
         smartbind(summaries_fam, .)
     thresholds <- c(0, 17, 23, 33)
     summaries_fam <<- group_qvs(summaries_fam, thresholds) |>
-        bound_qv() |>
-        assign_filters()
+        bound_qv() # |> assign_filters()
 })
 samples_39 <- readLines(file.path(proj_dir, 'comparison/NYGC/samples_39.txt'))
 summaries_fam <- filter(summaries_fam, sample %in% samples_39)

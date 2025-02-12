@@ -12,6 +12,7 @@ aver_time <- aggregate(minutes ~ size + step, sum_time, mean)
 norm_fct <- filter(aver_time, step == 'Total' & size == 1)$minutes
 
 (panel_a <- ggplot(sum_time, aes(size, minutes, color = step)) +
+    #geom_abline(slope = norm_fct, intercept = 0, color = 'gray50') +
     # geom_point(alpha = 0.5) +
     geom_line(aes(group = group), alpha = 0.5) +
     geom_point(data = aver_time, size = 2) +
@@ -71,3 +72,5 @@ cowplot::plot_grid(panel_a, panel_b,
     rel_heights = c(0.6, 0.4),
     align = 'v')
 ggsave(file.path(plots_dir, 'time.png'), width = 8, height = 10, dpi = 600, scale = 0.7)
+
+aver_time
